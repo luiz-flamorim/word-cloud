@@ -1,21 +1,30 @@
-export async function parseCSVWordFrequencies(file, columnIndex = 0) {
-  const stopWordsResponse = await fetch("./data/stop-words.json");
-  const stopWordsArray = await stopWordsResponse.json();
-  const stopWords = new Set(stopWordsArray);
+export async function parseCSVWordFrequencies(file, columnIndex) {
+  const [csvText, stopWordsText] = await Promise.all([
+    file.text(),
+    fetch("../data/stop-words.json").then((res) => res.json()),
+  ]);
 
-  const text = await file.text();
-  const lines = text.trim().split("\n");
+  const stopWordsHash = new Set(stopWordsText.map((w) => w.toLowerCase()));
+  const allRows = d3.csvParseRows(csvText);
+  const header = allRows[0];
+  console.log("parsed CSV: ", allRows);
+  
+  const rows = allRows.slice(1);
+  console.log("rows: ", rows);
+
   const wordCounts = {};
 
-  for (const line of lines) {
-    const columns = line.split(",");
-    const entry = columns[columnIndex] || "";
-    const cleaned = entry.toLowerCase().match(/\b\w+\b/g) || [];
+  for (const row of rows) {
+    if (!row[columnIndex]) continue;
 
-    for (const word of cleaned) {
-      if (!stopWords.has(word)) {
-        wordCounts[word] = (wordCounts[word] || 0) + 1;
-      }
+    const words = row[columnIndex]
+      .toLowerCase()
+      .replace(/[.,!?;:"“”‘’()\[\]{}<>\/\\\-–—_+=*@#&|^%$£€~`]/g, "")
+      .split(/\s+/)
+      .filter((word) => word.length > 1 && !stopWordsHash.has(word));
+
+    for (const word of words) {
+      wordCounts[word] = (wordCounts[word] || 0) + 1;
     }
   }
 
